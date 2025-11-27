@@ -1,0 +1,18 @@
+server:
+  addr: ":8080"
+  frontend_url: "http://localhost:3000"
+  full_address: "http://localhost:8080"
+
+database:
+  host: "localhost"
+  port: 3306
+  database: "project"
+  username: "root"
+  password: "" # Will be overridden from .env
+
+oauth:
+  google:
+    redirect_url: "http://localhost:8080/api/auth/google/callback"
+    client_id: "" # Will be overridden from .env
+    client_secret: "" # Will be overridden from .env
+

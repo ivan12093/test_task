@@ -1,0 +1,7 @@
+server:
+  addr: ":3000"
+
+api:
+  base_url: "http://localhost:8080"
+
+

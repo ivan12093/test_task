@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_test
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/db/create_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test_network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: server_test
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MYSQLHOST=${MYSQLHOST:-mysql}
+      - MYSQLPORT=${MYSQLPORT:-3306}
+      - MYSQLDATABASE=${MYSQLDATABASE}
+      - MYSQLUSER=${MYSQLUSER}
+      - MYSQLPASSWORD=${MYSQLPASSWORD}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+    env_file:
+      - ./server/.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./server/config.yml:/root/config.yml
+    networks:
+      - test_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend_test
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - API_BASE_URL=${API_BASE_URL:-http://server:8080}
+    depends_on:
+      - server
+    volumes:
+      - ./frontend/config.yml:/root/config.yml
+    networks:
+      - test_network
+
+volumes:
+  mysql_data:
+
+networks:
+  test_network:
+    driver: bridge
+
