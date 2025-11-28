@@ -32,6 +32,7 @@ func (h *Handler) showLoginForm(w http.ResponseWriter, r *http.Request, data pag
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	h.logger.Info("auth status", "is_authenticated", result.IsAuthenticated)
 	if result.IsAuthenticated {
 		http.Redirect(w, r, "/profile", http.StatusSeeOther)
 		return

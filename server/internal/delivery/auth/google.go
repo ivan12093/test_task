@@ -31,7 +31,6 @@ func (h *Handler) GetGoogleAuthURL(w http.ResponseWriter, r *http.Request) {
 		Name:     stateCookieName,
 		Value:    state,
 		Path:     "/",
-		HttpOnly: false,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(stateCookieMaxAge.Seconds()),
@@ -132,13 +131,6 @@ func (h *Handler) LogInWithGoogle(w http.ResponseWriter, r *http.Request) {
 			errorMessage = "failed to log in with google"
 		}
 		h.logger.Error("failed to log in with google", "error", err)
-
-		redirectURL, err := url.Parse(h.frontendURL + "/login")
-		if err != nil {
-			h.logger.Error("failed to parse redirect URL", "error", err)
-			httptools.WriteJSONError(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
 		redirectURL.RawQuery = url.Values{"error": {errorMessage}}.Encode()
 		http.Redirect(w, r, redirectURL.String(), http.StatusSeeOther)
 		return
@@ -169,7 +161,8 @@ func (h *Handler) LogInWithGoogle(w http.ResponseWriter, r *http.Request) {
 	redirectURL, err = url.Parse(h.frontendURL + "/profile")
 	if err != nil {
 		h.logger.Error("failed to parse redirect URL", "error", err)
-		httptools.WriteJSONError(w, http.StatusInternalServerError, "internal server error")
+		redirectURL.RawQuery = url.Values{"error": {"internal server error"}}.Encode()
+		http.Redirect(w, r, redirectURL.String(), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, redirectURL.String(), http.StatusSeeOther)

@@ -27,9 +27,14 @@ func SetupRoutes(config RoutesConfig) *mux.Router {
 	router.NotFoundHandler = http.HandlerFunc(NotFound)
 	router.Use(config.PanicMiddleware.PanicMiddleware)
 
-	corsRouter := router.Methods(http.MethodGet, http.MethodPost,
-		http.MethodPut, http.MethodDelete, http.MethodOptions).Subrouter()
-	corsRouter.Use(config.CORSMiddleware.Handler)
+	var corsRouter *mux.Router
+	if config.CORSMiddleware != nil {
+		corsRouter = router.Methods(http.MethodGet, http.MethodPost,
+			http.MethodPut, http.MethodDelete, http.MethodOptions).Subrouter()
+		corsRouter.Use(config.CORSMiddleware.Handler)
+	} else {
+		corsRouter = router
+	}
 
 	authRouter := corsRouter.Methods(http.MethodGet, http.MethodPost,
 		http.MethodPut, http.MethodDelete, http.MethodOptions).Subrouter()
@@ -43,7 +48,11 @@ func SetupRoutes(config RoutesConfig) *mux.Router {
 	unAuthRouter.HandleFunc("/api/auth/login", config.AuthHandler.LogInWithEmail).Methods(http.MethodPost)
 	unAuthRouter.HandleFunc("/api/auth/google/url", config.AuthHandler.GetGoogleAuthURL).Methods(http.MethodGet)
 
-	corsRouter.Handle("/api/auth/status", config.CSRFMiddleware.SetCSRFToken(http.HandlerFunc(config.AuthHandler.CheckAuthStatus))).Methods(http.MethodGet)
+	if config.CORSMiddleware != nil {
+		corsRouter.Handle("/api/auth/status", config.CSRFMiddleware.SetCSRFToken(http.HandlerFunc(config.AuthHandler.CheckAuthStatus))).Methods(http.MethodGet)
+	} else {
+		router.Handle("/api/auth/status", config.CSRFMiddleware.SetCSRFToken(http.HandlerFunc(config.AuthHandler.CheckAuthStatus))).Methods(http.MethodGet)
+	}
 
 	router.HandleFunc("/ping", Ping).Methods(http.MethodGet)
 

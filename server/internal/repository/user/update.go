@@ -9,7 +9,6 @@ import (
 )
 
 func (r *Repository) UpdateProfile(ctx context.Context, profile *domain.Profile) error {
-	// Преобразуем пустые строки в NULL для nullable полей
 	var fullName, phone interface{}
 	if profile.FullName == "" {
 		fullName = nil

@@ -2,6 +2,7 @@ server:
   addr: ":8080"
   frontend_url: "http://localhost:3000"
   full_address: "http://localhost:8080"
+  cors_enabled: true  # Can be overridden by ENABLE_CORS or CORS_ENABLED env variable
 
 database:
   host: "localhost"

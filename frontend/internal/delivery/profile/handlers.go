@@ -88,7 +88,6 @@ func (h *Handler) EditProfile(w http.ResponseWriter, r *http.Request) {
 			Email:    result.Profile.Email,
 		}
 
-		// Читаем query параметры для сообщений
 		if errorMsg := r.URL.Query().Get("error"); errorMsg != "" {
 			data.Error = errorMsg
 		}

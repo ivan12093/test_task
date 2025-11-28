@@ -38,6 +38,8 @@ services:
       - MYSQLUSER=${MYSQLUSER}
       - MYSQLPASSWORD=${MYSQLPASSWORD}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - SERVER_URL=${SERVER_URL:-http://localhost:8080}
+      - PORT=${PORT:-8080}
     env_file:
       - ./server/.env
     depends_on:
@@ -58,6 +60,7 @@ services:
       - "3000:3000"
     environment:
       - API_BASE_URL=${API_BASE_URL:-http://server:8080}
+      - PORT=${PORT:-3000}
     depends_on:
       - server
     volumes:

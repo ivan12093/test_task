@@ -37,6 +37,8 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
+	logger.Info("start3")
+
 	cfg, err := config.Load(*configPath, *envPath)
 	if err != nil {
 		logger.Error("failed to load config", "error", err)
@@ -68,17 +70,25 @@ func main() {
 	profileUseCase := profileUC.NewUseCase(logger, userRepository)
 	authUseCase := authUC.NewUseCase(logger, userRepository, sessionRepository, googleOAuthGateway, csrfUseCase)
 
-	authHandler := authDelivery.NewHandler(authUseCase, sessionRepository, logger, cfg.Server.FrontendURL)
+	authHandler := authDelivery.NewHandler(authUseCase, sessionRepository, logger, cfg.Server.FrontendURL, cfg)
 	profileHandler := profileDelivery.NewHandler(logger, profileUseCase)
 
 	authMiddleware := authDelivery.NewAuthMiddleware(logger, sessionRepository)
 	csrfMiddleware := csrfDelivery.NewCSRFMiddleware(logger, csrfUseCase)
 	panicMiddleware := middleware.NewPanicMiddleware(logger)
-	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   []string{cfg.Server.FrontendURL},
-		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
-		AllowCredentials: true,
-	})
+	loggingMiddleware := middleware.NewLoggingMiddleware(logger)
+
+	var corsMiddleware *cors.Cors
+	if cfg.Server.CORSEnabled {
+		corsMiddleware = cors.New(cors.Options{
+			AllowedOrigins:   []string{cfg.Server.FrontendURL},
+			AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+			AllowCredentials: true,
+		})
+		logger.Info("CORS enabled", "frontend_url", cfg.Server.FrontendURL)
+	} else {
+		logger.Info("CORS disabled")
+	}
 
 	router := SetupRoutes(RoutesConfig{
 		AuthHandler:     authHandler,
@@ -89,9 +99,11 @@ func main() {
 		CORSMiddleware:  corsMiddleware,
 	})
 
+	handler := loggingMiddleware.AccessLog(router)
+
 	server := &http.Server{
 		Addr:         cfg.Server.Addr,
-		Handler:      router,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,

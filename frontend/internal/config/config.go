@@ -31,9 +31,20 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if apiBaseURL := os.Getenv("API_BASE_URL"); apiBaseURL != "" {
-		config.API.BaseURL = apiBaseURL
-	}
+	applyEnvOverrides(&config)
 
 	return &config, nil
+}
+
+func applyEnvOverrides(config *Config) {
+	if val := os.Getenv("SERVER_ADDR"); val != "" {
+		config.Server.Addr = val
+	}
+	if val := os.Getenv("PORT"); val != "" {
+		config.Server.Addr = ":" + val
+	}
+
+	if val := os.Getenv("API_BASE_URL"); val != "" {
+		config.API.BaseURL = val
+	}
 }

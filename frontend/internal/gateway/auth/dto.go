@@ -31,6 +31,6 @@ type logoutResponse struct {
 }
 
 type authStatusResponse struct {
-	IsAuthenticated bool   `json:"is_authenticated"`
+	IsAuthenticated bool   `json:"authenticated"`
 	Error           string `json:"error"`
 }

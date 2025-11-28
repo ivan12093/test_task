@@ -16,7 +16,9 @@ import (
 	profileDelivery "frontend/internal/delivery/profile"
 	authGateway "frontend/internal/gateway/auth"
 	profileGateway "frontend/internal/gateway/profile"
+	"frontend/internal/pkg/logging"
 	"frontend/internal/pkg/ping"
+	"frontend/internal/pkg/proxy"
 )
 
 func main() {
@@ -55,10 +57,15 @@ func main() {
 	authHandler := authDelivery.NewHandler(logger, templates, authGW)
 	profileHandler := profileDelivery.NewHandler(logger, templates, profileGW)
 
+	loggingMiddleware := logging.NewLoggingMiddleware(logger)
+	proxyHandler := proxy.NewProxyHandler(logger, cfg.API.BaseURL)
+
 	handler := SetupRoutes(RoutesConfig{
-		AuthHandler:    authHandler,
-		ProfileHandler: profileHandler,
-		Templates:      templates,
+		AuthHandler:       authHandler,
+		ProfileHandler:    profileHandler,
+		Templates:         templates,
+		LoggingMiddleware: loggingMiddleware,
+		ProxyHandler:      proxyHandler,
 	})
 
 	server := &http.Server{

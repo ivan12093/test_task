@@ -18,6 +18,7 @@ type ServerConfig struct {
 	Addr        string `yaml:"addr"`
 	FrontendURL string `yaml:"frontend_url"`
 	FullAddress string `yaml:"full_address"`
+	CORSEnabled bool   `yaml:"cors_enabled"`
 }
 
 type DatabaseConfig struct {
@@ -59,35 +60,96 @@ func Load(configPath string, envPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if clientID := os.Getenv("GOOGLE_CLIENT_ID"); clientID != "" {
-		config.OAuth.Google.ClientID = clientID
+	applyEnvOverrides(&config)
+
+	return &config, nil
+}
+
+func applyEnvOverrides(config *Config) {
+	if val := os.Getenv("SERVER_ADDR"); val != "" {
+		config.Server.Addr = val
 	}
-	if clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); clientSecret != "" {
-		config.OAuth.Google.ClientSecret = clientSecret
+	if val := os.Getenv("PORT"); val != "" {
+		config.Server.Addr = ":" + val
 	}
-	if dbPassword := os.Getenv("MYSQLPASSWORD"); dbPassword != "" {
-		config.Database.Password = dbPassword
+	if val := os.Getenv("SERVER_FRONTEND_URL"); val != "" {
+		config.Server.FrontendURL = val
 	}
-	if dbHost := os.Getenv("MYSQLHOST"); dbHost != "" {
-		config.Database.Host = dbHost
+	if val := os.Getenv("FRONTEND_URL"); val != "" {
+		config.Server.FrontendURL = val
 	}
-	if dbPort := os.Getenv("MYSQLPORT"); dbPort != "" {
+	if val := os.Getenv("SERVER_FULL_ADDRESS"); val != "" {
+		config.Server.FullAddress = val
+	}
+	if val := os.Getenv("SERVER_URL"); val != "" {
+		config.Server.FullAddress = val
+		if config.OAuth.Google.RedirectURL == "" || config.OAuth.Google.RedirectURL == "http://localhost:8080/api/auth/google/callback" {
+			config.OAuth.Google.RedirectURL = val + "/api/auth/google/callback"
+		}
+	}
+
+	if val := os.Getenv("DATABASE_HOST"); val != "" {
+		config.Database.Host = val
+	}
+	if val := os.Getenv("MYSQLHOST"); val != "" {
+		config.Database.Host = val
+	}
+	if val := os.Getenv("DATABASE_PORT"); val != "" {
 		var port int
-		if _, err := fmt.Sscanf(dbPort, "%d", &port); err == nil {
+		if _, err := fmt.Sscanf(val, "%d", &port); err == nil {
 			config.Database.Port = port
 		}
 	}
-	if dbName := os.Getenv("MYSQLDATABASE"); dbName != "" {
-		config.Database.Database = dbName
+	if val := os.Getenv("MYSQLPORT"); val != "" {
+		var port int
+		if _, err := fmt.Sscanf(val, "%d", &port); err == nil {
+			config.Database.Port = port
+		}
 	}
-	if dbUser := os.Getenv("MYSQLUSER"); dbUser != "" {
-		config.Database.Username = dbUser
+	if val := os.Getenv("DATABASE_DATABASE"); val != "" {
+		config.Database.Database = val
 	}
-	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
-		config.Server.FrontendURL = frontendURL
+	if val := os.Getenv("MYSQLDATABASE"); val != "" {
+		config.Database.Database = val
+	}
+	if val := os.Getenv("DATABASE_USERNAME"); val != "" {
+		config.Database.Username = val
+	}
+	if val := os.Getenv("MYSQLUSER"); val != "" {
+		config.Database.Username = val
+	}
+	if val := os.Getenv("DATABASE_PASSWORD"); val != "" {
+		config.Database.Password = val
+	}
+	if val := os.Getenv("MYSQLPASSWORD"); val != "" {
+		config.Database.Password = val
 	}
 
-	return &config, nil
+	if val := os.Getenv("OAUTH_GOOGLE_CLIENT_ID"); val != "" {
+		config.OAuth.Google.ClientID = val
+	}
+	if val := os.Getenv("GOOGLE_CLIENT_ID"); val != "" {
+		config.OAuth.Google.ClientID = val
+	}
+	if val := os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"); val != "" {
+		config.OAuth.Google.ClientSecret = val
+	}
+	if val := os.Getenv("GOOGLE_CLIENT_SECRET"); val != "" {
+		config.OAuth.Google.ClientSecret = val
+	}
+	if val := os.Getenv("OAUTH_GOOGLE_REDIRECT_URL"); val != "" {
+		config.OAuth.Google.RedirectURL = val
+	}
+	if val := os.Getenv("OAUTH_REDIRECT_URL"); val != "" {
+		config.OAuth.Google.RedirectURL = val
+	}
+
+	if val := os.Getenv("ENABLE_CORS"); val != "" {
+		config.Server.CORSEnabled = val == "true" || val == "1" || val == "yes"
+	}
+	if val := os.Getenv("CORS_ENABLED"); val != "" {
+		config.Server.CORSEnabled = val == "true" || val == "1" || val == "yes"
+	}
 }
 
 func (c *DatabaseConfig) DSN() string {

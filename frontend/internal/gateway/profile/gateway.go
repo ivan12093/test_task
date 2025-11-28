@@ -127,7 +127,6 @@ func (g *gateway) UpdateProfile(ctx context.Context, profile *domain.Profile) (*
 		return result, nil
 	}
 
-	// UpdateProfile returns only a message, so we keep the profile that was sent
 	result.Profile = profile
 
 	return result, nil

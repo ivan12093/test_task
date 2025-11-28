@@ -8,12 +8,16 @@ import (
 	profileDelivery "frontend/internal/delivery/profile"
 	"frontend/internal/pkg/cache"
 	"frontend/internal/pkg/cookies"
+	"frontend/internal/pkg/logging"
+	"frontend/internal/pkg/proxy"
 )
 
 type RoutesConfig struct {
-	AuthHandler    *authDelivery.Handler
-	ProfileHandler *profileDelivery.Handler
-	Templates      *template.Template
+	AuthHandler       *authDelivery.Handler
+	ProfileHandler    *profileDelivery.Handler
+	Templates         *template.Template
+	LoggingMiddleware *logging.LoggingMiddleware
+	ProxyHandler      *proxy.ProxyHandler
 }
 
 func SetupRoutes(config RoutesConfig) http.Handler {
@@ -21,6 +25,10 @@ func SetupRoutes(config RoutesConfig) http.Handler {
 
 	staticFS := http.FileServer(http.Dir("static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", staticFS))
+
+	if config.ProxyHandler != nil {
+		mux.Handle("/api/", config.ProxyHandler)
+	}
 
 	mux.HandleFunc("/login", config.AuthHandler.LoginPage)
 	mux.HandleFunc("/login/google", config.AuthHandler.GoogleLogin)
@@ -45,7 +53,8 @@ func SetupRoutes(config RoutesConfig) http.Handler {
 		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 	})
 
-	handler := cookies.Middleware(mux)
+	handler := config.LoggingMiddleware.AccessLog(mux)
+	handler = cookies.Middleware(handler)
 	handler = cache.NoCacheMiddleware(handler)
 	return handler
 }
