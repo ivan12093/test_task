@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+const (
+	httpClientTimeout  = 30 * time.Second
+	maxRequestBodySize = 10 * 1024 * 1024
+)
+
 type ProxyHandler struct {
 	logger     *slog.Logger
 	backendURL string
@@ -20,6 +25,7 @@ func NewProxyHandler(logger *slog.Logger, backendURL string) *ProxyHandler {
 		logger:     logger,
 		backendURL: strings.TrimSuffix(backendURL, "/"),
 		client: &http.Client{
+			Timeout: httpClientTimeout,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
@@ -34,6 +40,17 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *ProxyHandler) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
+	if r.ContentLength > maxRequestBodySize {
+		p.logger.Warn("request body too large", "size", r.ContentLength, "max", maxRequestBodySize)
+		http.Error(w, "Request Entity Too Large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	var body io.Reader = r.Body
+	if r.ContentLength > 0 {
+		body = io.LimitReader(r.Body, maxRequestBodySize)
+	}
+
 	backendURL, err := url.Parse(p.backendURL + r.URL.Path)
 	if err != nil {
 		p.logger.Error("failed to parse backend URL", "error", err)
@@ -43,7 +60,7 @@ func (p *ProxyHandler) proxyRequest(w http.ResponseWriter, r *http.Request) {
 
 	backendURL.RawQuery = r.URL.RawQuery
 
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, backendURL.String(), r.Body)
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, backendURL.String(), body)
 	if err != nil {
 		p.logger.Error("failed to create proxy request", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -77,7 +94,7 @@ func (p *ProxyHandler) proxyRequest(w http.ResponseWriter, r *http.Request) {
 
 	size, err := io.Copy(w, resp.Body)
 	if err != nil {
-		p.logger.Error("failed to copy response body", "error", err)
+		p.logger.Error("failed to copy response body", "error", err, "bytes_copied", size)
 		return
 	}
 

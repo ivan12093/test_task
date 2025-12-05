@@ -31,9 +31,12 @@ func (r *Repository) CreateUserWithOAuthInfo(ctx context.Context, oauthInfo *dom
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
+	committed := false
 	defer func() {
-		if err != nil {
-			tx.Rollback()
+		if !committed {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				r.logger.Error("failed to rollback transaction", "error", rollbackErr)
+			}
 		}
 	}()
 
@@ -52,7 +55,7 @@ func (r *Repository) CreateUserWithOAuthInfo(ctx context.Context, oauthInfo *dom
 		r.logger.Error("failed to create user with oauth info", "error", err)
 		return fmt.Errorf("failed to create user with oauth info: %w", err)
 	}
-	
+
 	userID, err := result.LastInsertId()
 	if err != nil {
 		r.logger.Error("failed to get last insert id", "error", err)
@@ -69,10 +72,10 @@ func (r *Repository) CreateUserWithOAuthInfo(ctx context.Context, oauthInfo *dom
 		return fmt.Errorf("failed to create oauth account: %w", err)
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	if err = tx.Commit(); err != nil {
 		r.logger.Error("failed to commit transaction", "error", err)
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	committed = true
 	return nil
 }

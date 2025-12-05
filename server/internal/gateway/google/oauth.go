@@ -7,13 +7,18 @@ import (
 	"io"
 	"net/http"
 	"server/internal/domain"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
-const googleUserInfoURL = "https://www.googleapis.com/oauth2/v3/userinfo"
-const googleProviderName = "google"
+const (
+	googleUserInfoURL    = "https://www.googleapis.com/oauth2/v3/userinfo"
+	googleProviderName   = "google"
+	httpClientTimeout    = 30 * time.Second
+	maxErrorResponseSize = 1024
+)
 
 type OAuthGateway struct {
 	config oauth2.Config
@@ -45,16 +50,24 @@ func (g *OAuthGateway) GetOAuthUserInfo(ctx context.Context, code, purpose strin
 		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
 
-	client := g.config.Client(ctx, token)
-	resp, err := client.Get(googleUserInfoURL)
+	httpClient := g.config.Client(ctx, token)
+	httpClient.Timeout = httpClientTimeout
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, googleUserInfoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to get user info: status %d, body: %s", resp.StatusCode, string(body))
+		limitedReader := io.LimitReader(resp.Body, maxErrorResponseSize)
+		io.Copy(io.Discard, limitedReader)
+		return nil, fmt.Errorf("failed to get user info: status %d", resp.StatusCode)
 	}
 
 	googleUser := googleUserDTO{}

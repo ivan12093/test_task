@@ -37,8 +37,6 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
-	logger.Info("start3")
-
 	cfg, err := config.Load(*configPath, *envPath)
 	if err != nil {
 		logger.Error("failed to load config", "error", err)

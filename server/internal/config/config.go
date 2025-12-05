@@ -66,90 +66,76 @@ func Load(configPath string, envPath string) (*Config, error) {
 }
 
 func applyEnvOverrides(config *Config) {
-	if val := os.Getenv("SERVER_ADDR"); val != "" {
+	if val := getEnvFirst("PORT"); val != "" {
+		config.Server.Addr = ":" + val
+	} else if val := getEnvFirst("SERVER_ADDR"); val != "" {
 		config.Server.Addr = val
 	}
-	if val := os.Getenv("PORT"); val != "" {
-		config.Server.Addr = ":" + val
-	}
-	if val := os.Getenv("SERVER_FRONTEND_URL"); val != "" {
+
+	if val := getEnvFirst("FRONTEND_URL", "SERVER_FRONTEND_URL"); val != "" {
 		config.Server.FrontendURL = val
-	}
-	if val := os.Getenv("FRONTEND_URL"); val != "" {
-		config.Server.FrontendURL = val
-	}
-	if val := os.Getenv("SERVER_FULL_ADDRESS"); val != "" {
-		config.Server.FullAddress = val
-	}
-	if val := os.Getenv("SERVER_URL"); val != "" {
-		config.Server.FullAddress = val
-		if config.OAuth.Google.RedirectURL == "" || config.OAuth.Google.RedirectURL == "http://localhost:8080/api/auth/google/callback" {
-			config.OAuth.Google.RedirectURL = val + "/api/auth/google/callback"
-		}
 	}
 
-	if val := os.Getenv("DATABASE_HOST"); val != "" {
+	if val := getEnvFirst("SERVER_URL", "SERVER_FULL_ADDRESS"); val != "" {
+		config.Server.FullAddress = val
+	}
+
+	if val := getEnvFirst("MYSQLHOST", "DATABASE_HOST"); val != "" {
 		config.Database.Host = val
 	}
-	if val := os.Getenv("MYSQLHOST"); val != "" {
-		config.Database.Host = val
+
+	if port := getEnvInt("MYSQLPORT", "DATABASE_PORT"); port > 0 {
+		config.Database.Port = port
 	}
-	if val := os.Getenv("DATABASE_PORT"); val != "" {
-		var port int
-		if _, err := fmt.Sscanf(val, "%d", &port); err == nil {
-			config.Database.Port = port
-		}
-	}
-	if val := os.Getenv("MYSQLPORT"); val != "" {
-		var port int
-		if _, err := fmt.Sscanf(val, "%d", &port); err == nil {
-			config.Database.Port = port
-		}
-	}
-	if val := os.Getenv("DATABASE_DATABASE"); val != "" {
+
+	if val := getEnvFirst("MYSQLDATABASE", "DATABASE_DATABASE"); val != "" {
 		config.Database.Database = val
 	}
-	if val := os.Getenv("MYSQLDATABASE"); val != "" {
-		config.Database.Database = val
-	}
-	if val := os.Getenv("DATABASE_USERNAME"); val != "" {
+
+	if val := getEnvFirst("MYSQLUSER", "DATABASE_USERNAME"); val != "" {
 		config.Database.Username = val
 	}
-	if val := os.Getenv("MYSQLUSER"); val != "" {
-		config.Database.Username = val
-	}
-	if val := os.Getenv("DATABASE_PASSWORD"); val != "" {
-		config.Database.Password = val
-	}
-	if val := os.Getenv("MYSQLPASSWORD"); val != "" {
+
+	if val := getEnvFirst("MYSQLPASSWORD", "DATABASE_PASSWORD"); val != "" {
 		config.Database.Password = val
 	}
 
-	if val := os.Getenv("OAUTH_GOOGLE_CLIENT_ID"); val != "" {
+	if val := getEnvFirst("GOOGLE_CLIENT_ID", "OAUTH_GOOGLE_CLIENT_ID"); val != "" {
 		config.OAuth.Google.ClientID = val
 	}
-	if val := os.Getenv("GOOGLE_CLIENT_ID"); val != "" {
-		config.OAuth.Google.ClientID = val
-	}
-	if val := os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"); val != "" {
+
+	if val := getEnvFirst("GOOGLE_CLIENT_SECRET", "OAUTH_GOOGLE_CLIENT_SECRET"); val != "" {
 		config.OAuth.Google.ClientSecret = val
 	}
-	if val := os.Getenv("GOOGLE_CLIENT_SECRET"); val != "" {
-		config.OAuth.Google.ClientSecret = val
-	}
-	if val := os.Getenv("OAUTH_GOOGLE_REDIRECT_URL"); val != "" {
-		config.OAuth.Google.RedirectURL = val
-	}
-	if val := os.Getenv("OAUTH_REDIRECT_URL"); val != "" {
+
+	if val := getEnvFirst("OAUTH_REDIRECT_URL", "OAUTH_GOOGLE_REDIRECT_URL"); val != "" {
 		config.OAuth.Google.RedirectURL = val
 	}
 
-	if val := os.Getenv("ENABLE_CORS"); val != "" {
+	if val := getEnvFirst("CORS_ENABLED", "ENABLE_CORS"); val != "" {
 		config.Server.CORSEnabled = val == "true" || val == "1" || val == "yes"
 	}
-	if val := os.Getenv("CORS_ENABLED"); val != "" {
-		config.Server.CORSEnabled = val == "true" || val == "1" || val == "yes"
+}
+
+func getEnvFirst(keys ...string) string {
+	for _, key := range keys {
+		if val := os.Getenv(key); val != "" {
+			return val
+		}
 	}
+	return ""
+}
+
+func getEnvInt(keys ...string) int {
+	for _, key := range keys {
+		if val := os.Getenv(key); val != "" {
+			var port int
+			if _, err := fmt.Sscanf(val, "%d", &port); err == nil {
+				return port
+			}
+		}
+	}
+	return 0
 }
 
 func (c *DatabaseConfig) DSN() string {

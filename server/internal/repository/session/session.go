@@ -7,9 +7,15 @@ import (
 	"time"
 )
 
+const (
+	sessionCleanupInterval  = 1 * time.Hour
+	sessionCleanupBatchSize = 100
+)
+
 type Repository struct {
 	sessions map[string]*domain.Session
 	mu       sync.RWMutex
+	wg       sync.WaitGroup
 }
 
 func NewRepository() *Repository {
@@ -21,24 +27,36 @@ func NewRepository() *Repository {
 }
 
 func (r *Repository) clearExpiredSessions() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(sessionCleanupInterval)
 	defer ticker.Stop()
+
 	for range ticker.C {
-		r.mu.RLock()
-		expiredSessions := make([]string, 0)
-		for token, session := range r.sessions {
-			if time.Now().After(session.ExpiresAt) {
-				expiredSessions = append(expiredSessions, token)
+		r.cleanupBatch()
+	}
+}
+
+func (r *Repository) cleanupBatch() {
+	now := time.Now()
+	r.mu.RLock()
+	expiredSessions := make([]string, 0, sessionCleanupBatchSize)
+	count := 0
+	for token, session := range r.sessions {
+		if now.After(session.ExpiresAt) {
+			expiredSessions = append(expiredSessions, token)
+			count++
+			if count >= sessionCleanupBatchSize {
+				break
 			}
 		}
-		r.mu.RUnlock()
-		func() {
-			r.mu.Lock()
-			defer r.mu.Unlock()
-			for _, token := range expiredSessions {
-				delete(r.sessions, token)
-			}
-		}()
+	}
+	r.mu.RUnlock()
+
+	if len(expiredSessions) > 0 {
+		r.mu.Lock()
+		for _, token := range expiredSessions {
+			delete(r.sessions, token)
+		}
+		r.mu.Unlock()
 	}
 }
 
@@ -51,10 +69,14 @@ func (r *Repository) StoreSession(_ context.Context, session *domain.Session) er
 
 func (r *Repository) GetSessionByToken(ctx context.Context, token string) (*domain.Session, error) {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
 	session, ok := r.sessions[token]
-	if !ok || time.Now().After(session.ExpiresAt) {
-		_ = r.DeleteSession(ctx, token)
+	expired := ok && time.Now().After(session.ExpiresAt)
+	r.mu.RUnlock()
+
+	if !ok || expired {
+		if ok {
+			_ = r.DeleteSession(ctx, token)
+		}
 		return nil, domain.ErrSessionNotFound
 	}
 	return session, nil
